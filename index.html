@@ -9,52 +9,58 @@
     code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
     .copy-btn { opacity: 0; transition: opacity .15s ease; }
     pre:hover .copy-btn { opacity: 1; }
+    .card { border: 1px solid rgb(226 232 240); background: white; border-radius: 0.75rem; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.04); }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
   <header class="bg-gradient-to-br from-indigo-600 via-sky-600 to-cyan-500 text-white">
     <div class="mx-auto max-w-4xl px-6 py-10">
       <h1 class="text-3xl md:text-4xl font-semibold tracking-tight">Integrating EntraID with RapidIdentity for SSO</h1>
-      <p class="mt-2 text-white/90">RapidIdentity as SAML IdP for Microsoft Entra ID using Microsoft Graph and Entra PowerShell.</p>
+      <p class="mt-2 text-white/90">Set up RapidIdentity as a SAML identity provider for Microsoft Entra ID.</p>
     </div>
   </header>
 
   <main class="mx-auto max-w-4xl px-6 py-10 space-y-10">
-    <nav class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <nav class="card p-5">
       <h2 class="font-semibold">Contents</h2>
       <ol class="mt-3 grid gap-1 sm:grid-cols-2 text-slate-700">
         <li><a class="hover:text-sky-600" href="#overview">Overview</a></li>
-        <li><a class="hover:text-sky-600" href="#prereqs">Prerequisites</a></li>
-        <li><a class="hover:text-sky-600" href="#install-connect">Install and connect</a></li>
-        <li><a class="hover:text-sky-600" href="#rapididentity">RapidIdentity configuration</a></li>
-        <li><a class="hover:text-sky-600" href="#federate">Create federation</a></li>
-        <li><a class="hover:text-sky-600" href="#maintain">Update and maintenance</a></li>
-        <li><a class="hover:text-sky-600" href="#rollback">Rollback to managed</a></li>
-        <li><a class="hover:text-sky-600" href="#multi-domain">Multiple domains</a></li>
+        <li><a class="hover:text-sky-600" href="#prereqs">What you need</a></li>
+        <li><a class="hover:text-sky-600" href="#install">Install and sign in</a></li>
+        <li><a class="hover:text-sky-600" href="#rapididentity">RapidIdentity setup</a></li>
+        <li><a class="hover:text-sky-600" href="#federate">Create the federation</a></li>
+        <li><a class="hover:text-sky-600" href="#test">Test the sign‑in</a></li>
+        <li><a class="hover:text-sky-600" href="#maintain">Maintain and rotate</a></li>
+        <li><a class="hover:text-sky-600" href="#rollback">Rollback to cloud auth</a></li>
+        <li><a class="hover:text-sky-600" href="#appendix">Appendix: quick lab user</a></li>
       </ol>
     </nav>
 
-    <section id="overview" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section id="overview" class="card p-6">
       <h2 class="text-2xl font-semibold">Overview</h2>
-      <p class="mt-3">Configure RapidIdentity as a SAML identity provider for Microsoft Entra ID. The steps create a federation configuration for a verified custom domain and cover install, setup, federation, maintenance, and rollback.</p>
+      <p class="mt-3">In a few steps, you’ll point Microsoft Entra ID at RapidIdentity so users on a chosen domain authenticate with your IdP. You’ll import Microsoft’s relying‑party metadata into RapidIdentity, then create a domain federation in Entra using modern Microsoft Graph and Entra PowerShell.</p>
       <figure class="mt-6 rounded-lg border border-slate-200 bg-white p-3">
-        <img src="https://cdn.document360.io/4d958006-b877-42af-8de5-00e3bb7fe41d/Images/Documentation/Identity%20Automation%20_%20RapidIdentity%20Cloud%20Authentication%20Workflows%20_%20EntraID%20students%20only%20(1).png" alt="Authentication workflow: EntraID students only (1)" class="aspect-[16/9] w-full rounded-md object-cover" />
-        <figcaption class="mt-2 text-sm text-slate-600">Authentication workflow: EntraID students only (1)</figcaption>
+        <img src="https://cdn.document360.io/4d958006-b877-42af-8de5-00e3bb7fe41d/Images/Documentation/Identity%20Automation%20_%20RapidIdentity%20Cloud%20Authentication%20Workflows%20_%20EntraID%20students%20only%20(1).png" alt="Authentication workflow" class="aspect-[16/9] w-full rounded-md object-cover" />
+        <figcaption class="mt-2 text-sm text-slate-600">High‑level workflow</figcaption>
       </figure>
     </section>
 
-    <section id="prereqs" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 class="text-2xl font-semibold">Prerequisites</h2>
+    <section id="prereqs" class="card p-6">
+      <h2 class="text-2xl font-semibold">What you need</h2>
       <ul class="mt-3 list-disc ml-6">
-        <li>Verified custom domain in Microsoft Entra ID.</li>
-        <li>Entra permissions to manage domains.</li>
-        <li>RapidIdentity IdP entityID, SAML SSO URL, optional SLO URL, and the IdP signing certificate (X.509 public cert).</li>
-        <li>Access to Microsoft Entra relying party metadata for import into RapidIdentity.</li>
+        <li>A Microsoft Entra ID tenant where you can manage domains.</li>
+        <li>A verified custom domain you can use for testing.</li>
+        <li>Access to RapidIdentity admin at <span class="font-mono">https://lbenson.us004-rapididentity.com/</span>.</li>
+        <li>From RapidIdentity: entityID, SAML SSO URL, optional SLO URL, and the IdP signing certificate (public X.509).</li>
       </ul>
+      <div class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+        Tip: You can’t federate the built‑in <span class="font-mono">*.onmicrosoft.com</span> domain. Use a custom domain, or a subdomain of one you already own.
+      </div>
     </section>
 
-    <section id="install-connect" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 class="text-2xl font-semibold">Install and connect</h2>
+    <section id="install" class="card p-6">
+      <h2 class="text-2xl font-semibold">Install and sign in</h2>
+      <p class="mt-3">Install the Entra and Graph PowerShell modules once, then sign in with delegated permissions that allow you to write domain settings.</p>
       <div class="relative mt-4">
         <button class="copy-btn absolute right-2 top-2 rounded-md border border-slate-300 bg-white/80 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100" data-copy="#code-install">Copy</button>
         <pre class="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm"><code id="code-install" class="language-powershell">Install-Module Microsoft.Entra -Scope CurrentUser -Force
@@ -63,70 +69,117 @@ Connect-Entra -Scopes 'Domain.ReadWrite.All'</code></pre>
       </div>
     </section>
 
-    <section id="rapididentity" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 class="text-2xl font-semibold">RapidIdentity configuration</h2>
-      <p class="mt-3">Create a SAML relying party for Microsoft Entra ID in RapidIdentity by importing the Entra metadata URL.</p>
-      <div class="relative mt-4">
-        <button class="copy-btn absolute right-2 top-2 rounded-md border border-slate-300 bg-white/80 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100" data-copy="#code-metadata">Copy</button>
-        <pre class="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm"><code id="code-metadata" class="language-text">https://nexus.microsoftonline-p.com/federationmetadata/saml20/federationmetadata.xml</code></pre>
-      </div>
-      <p class="mt-3">For the China cloud, use: <code>https://nexus.partner.microsoftonline-p.cn/federationmetadata/saml20/federationmetadata.xml</code>.</p>
+    <section id="rapididentity" class="card p-6">
+      <h2 class="text-2xl font-semibold">RapidIdentity setup</h2>
+      <p class="mt-3">In RapidIdentity, create a relying party for Microsoft Entra using Microsoft’s SAML metadata. This ensures RapidIdentity knows where to send responses and which certificate to trust.</p>
+      <ol class="mt-3 list-decimal ml-6 space-y-2">
+        <li>Sign in to <span class="font-mono">https://lbenson.us004-rapididentity.com/</span>.</li>
+        <li>Create or open your Microsoft Entra relying party integration.</li>
+        <li>Import Microsoft’s SAML metadata: <span class="font-mono">https://nexus.microsoftonline-p.com/federationmetadata/saml20/federationmetadata.xml</span>.</li>
+        <li>Note the IdP values you will need in the next step: entityID, SSO URL, optional SLO URL, and the IdP signing certificate.</li>
+      </ol>
       <figure class="mt-6 rounded-lg border border-slate-200 bg-white p-3">
-        <img src="https://cdn.document360.io/4d958006-b877-42af-8de5-00e3bb7fe41d/Images/Documentation/Identity%20Automation%20_%20RapidIdentity%20Cloud%20Authentication%20Workflows%20_%20EntraID%20students%20only%20(2).png" alt="Authentication workflow: EntraID students only (2)" class="aspect-[16/9] w-full rounded-md object-cover" />
-        <figcaption class="mt-2 text-sm text-slate-600">Authentication workflow: EntraID students only (2)</figcaption>
+        <img src="https://cdn.document360.io/4d958006-b877-42af-8de5-00e3bb7fe41d/Images/Documentation/Identity%20Automation%20_%20RapidIdentity%20Cloud%20Authentication%20Workflows%20_%20EntraID%20students%20only%20(2).png" alt="RapidIdentity admin" class="aspect-[16/9] w-full rounded-md object-cover" />
+        <figcaption class="mt-2 text-sm text-slate-600">RapidIdentity admin</figcaption>
       </figure>
     </section>
 
-    <section id="federate" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 class="text-2xl font-semibold">Create federation</h2>
-      <div class="relative mt-4">
-        <button class="copy-btn absolute right-2 top-2 rounded-md border border-slate-300 bg-white/80 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100" data-copy="#code-newfed">Copy</button>
-        <pre class="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm"><code id="code-newfed" class="language-powershell">$domain = 'example.com'
+    <section id="federate" class="card p-6">
+      <h2 class="text-2xl font-semibold">Create the federation</h2>
+      <p class="mt-3">You will convert a managed domain to federated by creating an internal domain federation in Entra. Replace <span class="font-mono">example.com</span> with your verified domain and paste the values you captured from RapidIdentity.</p>
+      <div class="grid gap-6 md:grid-cols-2">
+        <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <h3 class="font-semibold">Manual values</h3>
+          <div class="relative mt-3">
+            <button class="copy-btn absolute right-2 top-2 rounded-md border border-slate-300 bg-white/80 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100" data-copy="#code-newfed">Copy</button>
+            <pre class="overflow-x-auto rounded-lg border border-slate-200 bg-white p-4 text-sm"><code id="code-newfed" class="language-powershell">$domain = 'example.com'
 $IssuerUri = 'urn:rapididentity:YOUR-REALM'
-$PassiveSignInUri = 'https://&lt;rapididentity-host&gt;/.../SAML2/SSO'
-$SignOutUri = 'https://&lt;rapididentity-host&gt;/.../SAML2/SLO'
-$ActiveSignInUri = 'https://&lt;rapididentity-host&gt;/.../PAOS'
+$PassiveSignInUri = 'https://lbenson.us004-rapididentity.com/saml2/sso'
+$SignOutUri = 'https://lbenson.us004-rapididentity.com/saml2/slo'
+$ActiveSignInUri = ''
 $SigningCertBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes('C:\path
 apididentity_signing.cer'))
-New-MgDomainFederationConfiguration -DomainId $domain `
-  -IssuerUri $IssuerUri `
-  -PassiveSignInUri $PassiveSignInUri `
-  -SignOutUri $SignOutUri `
-  -PreferredAuthenticationProtocol 'saml' `
-  -ActiveSignInUri $ActiveSignInUri `
-  -SigningCertificate $SigningCertBase64
+New-MgDomainFederationConfiguration -DomainId $domain -IssuerUri $IssuerUri -PassiveSignInUri $PassiveSignInUri -SignOutUri $SignOutUri -PreferredAuthenticationProtocol 'saml' -ActiveSignInUri $ActiveSignInUri -SigningCertificate $SigningCertBase64
 Get-MgDomainFederationConfiguration -DomainId $domain | Format-List *</code></pre>
+          </div>
+          <p class="mt-2 text-sm text-slate-600">If you don’t use SLO, leave SignOutUri blank.</p>
+        </div>
+        <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <h3 class="font-semibold">Parse from IdP metadata</h3>
+          <p class="mt-2 text-sm text-slate-700">If you have a RapidIdentity metadata XML file, this block extracts the values automatically.</p>
+          <div class="relative mt-3">
+            <button class="copy-btn absolute right-2 top-2 rounded-md border border-slate-300 bg-white/80 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100" data-copy="#code-parse">Copy</button>
+            <pre class="overflow-x-auto rounded-lg border border-slate-200 bg-white p-4 text-sm"><code id="code-parse" class="language-powershell">$domain = 'example.com'
+$IdpMetadataPath = 'C:\path
+apididentity-idp-metadata.xml'
+[xml]$xml = Get-Content $IdpMetadataPath
+$nsm = New-Object System.Xml.XmlNamespaceManager($xml.NameTable)
+$nsm.AddNamespace('md','urn:oasis:names:tc:SAML:2.0:metadata')
+$nsm.AddNamespace('ds','http://www.w3.org/2000/09/xmldsig#')
+$IssuerUri = $xml.EntityDescriptor.entityID
+$PassiveSignInUri = $xml.SelectSingleNode('//md:IDPSSODescriptor/md:SingleSignOnService[@Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"]',$nsm).Location
+$SignOutNode = $xml.SelectSingleNode('//md:IDPSSODescriptor/md:SingleLogoutService[@Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"]',$nsm)
+$SignOutUri = if ($SignOutNode) { $SignOutNode.Location } else { '' }
+$ActiveSignInUri = ''
+$SigningCertBase64 = ($xml.SelectSingleNode('//md:IDPSSODescriptor/ds:KeyDescriptor/ds:KeyInfo/ds:X509Data/ds:X509Certificate',$nsm).InnerText -replace '\s','')
+New-MgDomainFederationConfiguration -DomainId $domain -IssuerUri $IssuerUri -PassiveSignInUri $PassiveSignInUri -SignOutUri $SignOutUri -PreferredAuthenticationProtocol 'saml' -ActiveSignInUri $ActiveSignInUri -SigningCertificate $SigningCertBase64
+Get-MgDomainFederationConfiguration -DomainId $domain | Format-List *</code></pre>
+          </div>
+        </div>
+      </div>
+      <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        Success looks like this: the domain’s authentication type shows as federated, and your federation object lists your RapidIdentity URLs and certificate.
       </div>
     </section>
 
-    <section id="maintain" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 class="text-2xl font-semibold">Update and maintenance</h2>
+    <section id="test" class="card p-6">
+      <h2 class="text-2xl font-semibold">Test the sign‑in</h2>
+      <ol class="mt-3 list-decimal ml-6 space-y-2">
+        <li>Go to <span class="font-mono">https://myapps.microsoft.com</span> or <span class="font-mono">https://portal.office.com</span>.</li>
+        <li>Enter a user with the federated domain.</li>
+        <li>You should be redirected to RapidIdentity at <span class="font-mono">lbenson.us004-rapididentity.com</span> to authenticate, then returned to Microsoft.</li>
+      </ol>
+      <p class="mt-3 text-sm text-slate-600">If sign‑in fails, double‑check the SSO URL, certificate, and the NameID mapping in RapidIdentity.</p>
+    </section>
+
+    <section id="maintain" class="card p-6">
+      <h2 class="text-2xl font-semibold">Maintain and rotate</h2>
+      <p class="mt-3">When the signing certificate changes in RapidIdentity, update Entra with the new Base64 certificate. You can also adjust URIs and the issuer later.</p>
       <div class="relative mt-4">
-        <button class="copy-btn absolute right-2 top-2 rounded-md border border-slate-300 bg-white/80 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100" data-copy="#code-update">Copy</button>
-        <pre class="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm"><code id="code-update" class="language-powershell">$domain = 'example.com'
+        <button class="copy-btn absolute right-2 top-2 rounded-md border border-slate-300 bg-white/80 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100" data-copy="#code-maint">Copy</button>
+        <pre class="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm"><code id="code-maint" class="language-powershell">$domain = 'example.com'
 $SigningCertBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes('C:\path
 ew_signing.cer'))
 Set-EntraDomainFederationSettings -DomainName $domain -SigningCertificate $SigningCertBase64
-Set-EntraDomainFederationSettings -DomainName $domain `
-  -PassiveLogOnUri 'https://&lt;rapididentity-host&gt;/.../SAML2/SSO' `
-  -LogOffUri 'https://&lt;rapididentity-host&gt;/.../SAML2/SLO' `
-  -ActiveLogOnUri 'https://&lt;rapididentity-host&gt;/.../PAOS' `
-  -IssuerUri 'urn:rapididentity:YOUR-REALM' `
-  -PreferredAuthenticationProtocol 'Saml'</code></pre>
+Set-EntraDomainFederationSettings -DomainName $domain -PassiveLogOnUri 'https://lbenson.us004-rapididentity.com/saml2/sso' -LogOffUri 'https://lbenson.us004-rapididentity.com/saml2/slo' -IssuerUri 'urn:rapididentity:YOUR-REALM' -PreferredAuthenticationProtocol 'Saml'</code></pre>
       </div>
     </section>
 
-    <section id="rollback" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 class="text-2xl font-semibold">Rollback to managed</h2>
+    <section id="rollback" class="card p-6">
+      <h2 class="text-2xl font-semibold">Rollback to cloud auth</h2>
+      <p class="mt-3">If you need to undo federation for the domain, switch it back to managed authentication.</p>
       <div class="relative mt-4">
-        <button class="copy-btn absolute right-2 top-2 rounded-md border border-slate-300 bg-white/80 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100" data-copy="#code-managed">Copy</button>
-        <pre class="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm"><code id="code-managed" class="language-powershell">Update-MgDomain -DomainId 'example.com' -AuthenticationType 'Managed'</code></pre>
+        <button class="copy-btn absolute right-2 top-2 rounded-md border border-slate-300 bg-white/80 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100" data-copy="#code-rollback">Copy</button>
+        <pre class="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm"><code id="code-rollback" class="language-powershell">Update-MgDomain -DomainId 'example.com' -AuthenticationType 'Managed'</code></pre>
       </div>
     </section>
 
-    <section id="multi-domain" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 class="text-2xl font-semibold">Multiple domains</h2>
-      <p class="mt-3">When federating multiple top-level domains, use a unique IssuerUri value for each domain. For subdomains, the issuer typically matches the parent.</p>
+    <section id="appendix" class="card p-6">
+      <h2 class="text-2xl font-semibold">Appendix: quick lab user</h2>
+      <p class="mt-3">For a cloud‑only lab user, set an ImmutableID that matches the NameID your IdP will send. This creates a user and assigns a random ImmutableID.</p>
+      <div class="relative mt-4">
+        <button class="copy-btn absolute right-2 top-2 rounded-md border border-slate-300 bg-white/80 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100" data-copy="#code-user">Copy</button>
+        <pre class="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm"><code id="code-user" class="language-powershell">$domain = 'example.com'
+$bytes = New-Object byte[] 16
+[Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+$iid = [Convert]::ToBase64String($bytes)
+$pwd = -join ((48..57)+(97..122) | Get-Random -Count 16 | % {[char]$_})
+$PasswordProfile = @{ Password = "$pwd" }
+New-MgUser -UserPrincipalName "lab.user@$domain" -DisplayName "Lab User" -AccountEnabled -MailNickName "labuser" -PasswordProfile $PasswordProfile -UsageLocation "US" -OnPremisesImmutableId $iid</code></pre>
+      </div>
+      <div class="mt-4 rounded-lg border border-slate-200 bg-white p-4 text-sm">
+        <p class="text-slate-700">In RapidIdentity, set NameID to the same value and ensure the UPN is emitted as an attribute where needed. If you use AD, convert the user’s <span class="font-mono">objectGUID</span> to Base64 for ImmutableID instead of generating a random value.</p>
+      </div>
     </section>
   </main>
 
