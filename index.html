@@ -31,13 +31,16 @@
         <li><a class="hover:text-sky-600" href="#maintain">Update and maintenance</a></li>
         <li><a class="hover:text-sky-600" href="#rollback">Rollback to managed</a></li>
         <li><a class="hover:text-sky-600" href="#multi-domain">Multiple domains</a></li>
-        <li><a class="hover:text-sky-600" href="#screenshots">Screenshots</a></li>
       </ol>
     </nav>
 
     <section id="overview" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <h2 class="text-2xl font-semibold">Overview</h2>
-      <p class="mt-3">This guide configures RapidIdentity as a SAML identity provider for Microsoft Entra ID. The steps create a federation configuration for a verified custom domain and cover install, setup, federation, maintenance, and rollback.</p>
+      <p class="mt-3">Configure RapidIdentity as a SAML identity provider for Microsoft Entra ID. The steps create a federation configuration for a verified custom domain and cover install, setup, federation, maintenance, and rollback.</p>
+      <figure class="mt-6 rounded-lg border border-slate-200 bg-white p-3">
+        <img src="https://cdn.document360.io/4d958006-b877-42af-8de5-00e3bb7fe41d/Images/Documentation/Identity%20Automation%20_%20RapidIdentity%20Cloud%20Authentication%20Workflows%20_%20EntraID%20students%20only%20(1).png" alt="Authentication workflow: EntraID students only (1)" class="aspect-[16/9] w-full rounded-md object-cover" />
+        <figcaption class="mt-2 text-sm text-slate-600">Authentication workflow: EntraID students only (1)</figcaption>
+      </figure>
     </section>
 
     <section id="prereqs" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -68,11 +71,14 @@ Connect-Entra -Scopes 'Domain.ReadWrite.All'</code></pre>
         <pre class="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm"><code id="code-metadata" class="language-text">https://nexus.microsoftonline-p.com/federationmetadata/saml20/federationmetadata.xml</code></pre>
       </div>
       <p class="mt-3">For the China cloud, use: <code>https://nexus.partner.microsoftonline-p.cn/federationmetadata/saml20/federationmetadata.xml</code>.</p>
+      <figure class="mt-6 rounded-lg border border-slate-200 bg-white p-3">
+        <img src="https://cdn.document360.io/4d958006-b877-42af-8de5-00e3bb7fe41d/Images/Documentation/Identity%20Automation%20_%20RapidIdentity%20Cloud%20Authentication%20Workflows%20_%20EntraID%20students%20only%20(2).png" alt="Authentication workflow: EntraID students only (2)" class="aspect-[16/9] w-full rounded-md object-cover" />
+        <figcaption class="mt-2 text-sm text-slate-600">Authentication workflow: EntraID students only (2)</figcaption>
+      </figure>
     </section>
 
     <section id="federate" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <h2 class="text-2xl font-semibold">Create federation</h2>
-      <p class="mt-3">Create a domain federation configuration to enable SSO with RapidIdentity.</p>
       <div class="relative mt-4">
         <button class="copy-btn absolute right-2 top-2 rounded-md border border-slate-300 bg-white/80 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100" data-copy="#code-newfed">Copy</button>
         <pre class="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm"><code id="code-newfed" class="language-powershell">$domain = 'example.com'
@@ -121,20 +127,6 @@ Set-EntraDomainFederationSettings -DomainName $domain `
     <section id="multi-domain" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <h2 class="text-2xl font-semibold">Multiple domains</h2>
       <p class="mt-3">When federating multiple top-level domains, use a unique IssuerUri value for each domain. For subdomains, the issuer typically matches the parent.</p>
-    </section>
-
-    <section id="screenshots" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 class="text-2xl font-semibold">Screenshots</h2>
-      <div class="mt-6 grid grid-cols-1 gap-6">
-        <figure class="rounded-lg border border-slate-200 bg-white p-3">
-          <img src="https://cdn.document360.io/4d958006-b877-42af-8de5-00e3bb7fe41d/Images/Documentation/Identity%20Automation%20_%20RapidIdentity%20Cloud%20Authentication%20Workflows%20_%20EntraID%20students%20only%20(1).png" alt="Entra admin center SAML configuration screen" class="aspect-[16/9] w-full rounded-md object-cover" />
-          <figcaption class="mt-2 text-sm text-slate-600">Figure 1</figcaption>
-        </figure>
-        <figure class="rounded-lg border border-slate-200 bg-white p-3">
-          <img src="https://cdn.document360.io/4d958006-b877-42af-8de5-00e3bb7fe41d/Images/Documentation/Identity%20Automation%20_%20RapidIdentity%20Cloud%20Authentication%20Workflows%20_%20EntraID%20students%20only%20(2).png" alt="RapidIdentity admin metadata and endpoints" class="aspect-[16/9] w-full rounded-md object-cover" />
-          <figcaption class="mt-2 text-sm text-slate-600">Figure 2</figcaption>
-        </figure>
-      </div>
     </section>
   </main>
 
