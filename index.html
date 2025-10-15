@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Integrating Microsoft Entra ID with RapidIdentity for SSO — 2025 Update</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<meta content="Updated (2025) RapidIdentity ↔ Microsoft Entra ID federation guide with modern Microsoft Graph / Entra PowerShell commands." name="description"/>
+<style>
+    /* Print-friendly */
+    @media print {
+      .no-print { display: none !important; }
+      a[href^="http"]::after { content: " (" attr(href) ")"; font-weight: normal; font-size: 0.9em; }
+      .shadow, .shadow-md, .shadow-lg { box-shadow: none !important; }
+    }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .copy-btn { opacity: 0; transition: opacity .15s ease; }
+    pre:hover .copy-btn { opacity: 1; }
+    .fake-img {
+      background-image: linear-gradient(135deg, rgba(15,23,42,.06) 25%, transparent 25%), 
+                        linear-gradient(225deg, rgba(15,23,42,.06) 25%, transparent 25%), 
+                        linear-gradient(45deg, rgba(15,23,42,.06) 25%, transparent 25%), 
+                        linear-gradient(315deg, rgba(15,23,42,.06) 25%, #fff 25%);
+      background-position: 10px 0, 10px 0, 0 0, 0 0;
+      background-size: 10px 10px;
+      background-repeat: repeat;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+<header class="bg-gradient-to-br from-indigo-600 via-sky-600 to-cyan-500 text-white">
+<div class="mx-auto max-w-4xl px-6 py-12">
+<h1 class="text-3xl md:text-4xl font-bold tracking-tight">Integrating Microsoft Entra ID with RapidIdentity for SSO</h1>
+<p class="mt-2 text-white/90">Updated commands (Microsoft Graph &amp; Entra PowerShell), Tailwind-styled, and ready to drop in screenshots.</p>
+<p class="mt-1 text-sm text-white/80">Last updated: <strong>Oct 14, 2025</strong></p>
+</div>
+</header>
+<main class="mx-auto max-w-4xl px-6 py-10 space-y-10">
+<!-- Callout -->
+<section class="rounded-xl border border-amber-200 bg-amber-50 p-5">
+<h2 class="font-semibold text-amber-900">Heads-up on PowerShell changes</h2>
+<p class="mt-2 text-amber-900/90">Legacy <code>MSOnline</code> / <code>AzureAD</code> cmdlets shown in older guides are deprecated/retired. This document uses supported <code>Microsoft Entra</code> and <code>Microsoft Graph PowerShell</code> equivalents throughout.</p>
+<ul class="list-disc ml-6 mt-2 text-amber-900/90">
+<li><strong>Use now:</strong> <code>Connect-Entra</code>, <code>New-MgDomainFederationConfiguration</code>, <code>Set-EntraDomainFederationSettings</code>, <code>Update-MgDomain</code>.</li>
+<li><strong>Replaced:</strong> <code>Connect-MsolService</code>, <code>Convert-MsolDomainToFederated</code>, <code>Set-MsolDomainFederationSettings</code>, <code>Update-MsolFederatedDomain</code>.</li>
+</ul>
+</section>
+<!-- TOC -->
+<nav class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+<h2 class="font-semibold">Contents</h2>
+<ol class="mt-3 grid gap-1 sm:grid-cols-2 text-slate-700">
+<li><a class="hover:text-sky-600" href="#overview">Overview</a></li>
+<li><a class="hover:text-sky-600" href="#prereqs">Prerequisites</a></li>
+<li><a class="hover:text-sky-600" href="#entra-setup">Step 1 — Entra setup</a></li>
+<li><a class="hover:text-sky-600" href="#rapididentity-setup">Step 2 — RapidIdentity setup</a></li>
+<li><a class="hover:text-sky-600" href="#create-federation">Step 3 — Create federation (Graph)</a></li>
+<li><a class="hover:text-sky-600" href="#update-maintenance">Step 4 — Update &amp; maintenance</a></li>
+<li><a class="hover:text-sky-600" href="#defederate">Rollback to Managed (optional)</a></li>
+<li><a class="hover:text-sky-600" href="#multi-domain">Multiple domains note</a></li>
+<li><a class="hover:text-sky-600" href="#screenshots">Screenshots (from original Jamf doc)</a></li>
+<li><a class="hover:text-sky-600" href="#references">References</a></li>
+</ol>
+</nav>
+<!-- Overview -->
+<section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm" id="overview">
+<h2 class="text-2xl font-semibold">Overview</h2>
+<p class="mt-3">This guide configures RapidIdentity as a <em>SAML IdP</em> for Microsoft Entra ID (formerly Azure AD), enabling federated single sign-on (SSO) for a verified custom domain. It modernizes the PowerShell used in older instructions to rely on <strong>Microsoft Graph</strong> and <strong>Microsoft Entra PowerShell</strong>.</p>
+</section>
+<!-- Prereqs -->
+<section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm" id="prereqs">
+<h2 class="text-2xl font-semibold">Prerequisites</h2>
+<ul class="mt-3 list-disc ml-6">
+<li>Verified custom domain in Microsoft Entra ID (e.g., <code>example.com</code>).</li>
+<li>Role: <em>Domain Name Administrator</em> (or higher) for Entra changes.</li>
+<li>RapidIdentity IdP details: <strong>entityID</strong>, <strong>SAML SSO URL</strong>, optional <strong>SLO URL</strong>, and the IdP <strong>signing certificate</strong> (X.509 public cert).</li>
+<li>Network access to Microsoft Entra RP metadata (for the IdP to import): <code>https://nexus.microsoftonline-p.com/federationmetadata/saml20/federationmetadata.xml</code>.</li>
+</ul>
+</section>
+<!-- Entra setup -->
+<section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm" id="entra-setup">
+<h2 class="text-2xl font-semibold">Step 1 — Install &amp; connect (Entra / Graph)</h2>
+<p class="mt-3">Install the modules (once) and connect with delegated scopes suitable for domain write operations.</p>
+<div class="relative mt-4">
+<button class="copy-btn absolute right-2 top-2 rounded-md border border-slate-300 bg-white/80 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100" data-copy="#code-install">Copy</button>
+<pre class="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm"><code class="language-powershell" id="code-install"># Install (run once per machine)
+Install-Module Microsoft.Entra -Scope CurrentUser -Force
+Install-Module Microsoft.Graph -Scope CurrentUser -Force
+
+# Connect (Connect-Entra is an alias of Connect-MgGraph)
+Connect-Entra -Scopes 'Domain.ReadWrite.All','Directory.AccessAsUser.All'</code></pre>
+</div>
+</section>
+<!-- RapidIdentity setup -->
+<section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm" id="rapididentity-setup">
+<h2 class="text-2xl font-semibold">Step 2 — RapidIdentity configuration</h2>
+<p class="mt-3">In RapidIdentity (IdP), create a SAML <em>relying party</em> for Microsoft Entra using the Entra RP metadata URL:</p>
+<div class="relative mt-4">
+<button class="copy-btn absolute right-2 top-2 rounded-md border border-slate-300 bg-white/80 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100" data-copy="#code-metadata">Copy</button>
+<pre class="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm"><code class="language-text" id="code-metadata">https://nexus.microsoftonline-p.com/federationmetadata/saml20/federationmetadata.xml</code></pre>
+</div>
+<p class="mt-3 text-slate-700">If operating in the China cloud, use: <code>https://nexus.partner.microsoftonline-p.cn/federationmetadata/saml20/federationmetadata.xml</code>.</p>
+</section>
+<!-- Create federation -->
+<section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm" id="create-federation">
+<h2 class="text-2xl font-semibold">Step 3 — Create federation for the domain (Graph)</h2>
+<p class="mt-3">Convert <em>Managed → Federated</em> by creating an internal domain federation configuration. Replace placeholders from your RapidIdentity metadata.</p>
+<div class="relative mt-4">
+<button class="copy-btn absolute right-2 top-2 rounded-md border border-slate-300 bg-white/80 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100" data-copy="#code-newfed">Copy</button>
+<pre class="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm"><code class="language-powershell" id="code-newfed">$domain = 'example.com'
+
+# Values from RapidIdentity IdP metadata
+$IssuerUri         = 'urn:rapididentity:YOUR-REALM'                 # entityID
+$PassiveSignInUri  = 'https://&lt;rapididentity-host&gt;/.../SAML2/SSO'   # SAML SSO endpoint
+$SignOutUri        = 'https://&lt;rapididentity-host&gt;/.../SAML2/SLO'   # optional
+$ActiveSignInUri   = 'https://&lt;rapididentity-host&gt;/.../PAOS'        # optional (ECP/rich clients)
+$SigningCertBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes('C:\path\rapididentity_signing.cer'))
+
+# Create the federation (preferredAuthenticationProtocol can be 'saml' or 'wsFed')
+New-MgDomainFederationConfiguration -DomainId $domain `
+  -IssuerUri $IssuerUri `
+  -PassiveSignInUri $PassiveSignInUri `
+  -SignOutUri $SignOutUri `
+  -PreferredAuthenticationProtocol 'saml' `
+  -ActiveSignInUri $ActiveSignInUri `
+  -SigningCertificate $SigningCertBase64
+
+# Verify
+Get-MgDomainFederationConfiguration -DomainId $domain | Format-List *</code></pre>
+</div>
+<div class="mt-4 rounded-lg border border-cyan-200 bg-cyan-50 p-4">
+<p class="text-sm"><strong>Note:</strong> The <code>signingCertificate</code> and <code>nextSigningCertificate</code> values are Base64 text of the IdP X.509 public cert(s). Microsoft Entra automatically updates certificates from the IdP metadata when possible; keep them current in RapidIdentity as well.</p>
+</div>
+</section>
+<!-- Update & maintenance -->
+<section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm" id="update-maintenance">
+<h2 class="text-2xl font-semibold">Step 4 — Update &amp; maintenance</h2>
+<p class="mt-3">Use Entra cmdlets to rotate certs, change URIs, or tweak protocol settings.</p>
+<div class="relative mt-4">
+<button class="copy-btn absolute right-2 top-2 rounded-md border border-slate-300 bg-white/80 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100" data-copy="#code-update">Copy</button>
+<pre class="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm"><code class="language-powershell" id="code-update">$domain = 'example.com'
+
+# Rotate signing certificate
+$SigningCertBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes('C:\path\new_signing.cer'))
+Set-EntraDomainFederationSettings -DomainName $domain -SigningCertificate $SigningCertBase64
+
+# Update URIs or protocol later as needed
+Set-EntraDomainFederationSettings -DomainName $domain `
+  -PassiveLogOnUri  'https://&lt;rapididentity-host&gt;/.../SAML2/SSO' `
+  -LogOffUri        'https://&lt;rapididentity-host&gt;/.../SAML2/SLO' `
+  -ActiveLogOnUri   'https://&lt;rapididentity-host&gt;/.../PAOS' `
+  -IssuerUri        'urn:rapididentity:YOUR-REALM' `
+  -PreferredAuthenticationProtocol 'Saml'</code></pre>
+</div>
+</section>
+<!-- Defederate -->
+<section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm" id="defederate">
+<h2 class="text-2xl font-semibold">Optional — Roll back to cloud auth (Managed)</h2>
+<p class="mt-3">If you need to undo federation for a domain:</p>
+<div class="relative mt-4">
+<button class="copy-btn absolute right-2 top-2 rounded-md border border-slate-300 bg-white/80 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100" data-copy="#code-managed">Copy</button>
+<pre class="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm"><code class="language-powershell" id="code-managed"># After connecting with sufficient scopes (see Step 1)
+Update-MgDomain -DomainId 'example.com' -AuthenticationType 'Managed'</code></pre>
+</div>
+<p class="mt-3 text-sm text-slate-600">Tip: Some tenants require both <code>Domain.ReadWrite.All</code> and <code>Directory.AccessAsUser.All</code> when changing authentication type.</p>
+</section>
+<!-- Multiple domains -->
+<section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm" id="multi-domain">
+<h2 class="text-2xl font-semibold">Multiple domains: IssuerUri must be unique</h2>
+<p class="mt-3">When federating multiple <em>top‑level</em> domains, ensure each has a unique <code>IssuerUri</code>. The legacy <code>-SupportMultipleDomain</code> switch is no longer available in Graph/Entra. For subdomains, the Issuer typically matches the parent domain.</p>
+<ul class="list-disc ml-6 mt-3">
+<li>Check settings: <code>Get-EntraDomainFederationSettings -DomainName &lt;domain&gt;</code></li>
+<li>Update if needed: <code>Update-MgDomainFederationConfiguration</code> / <code>Set-EntraDomainFederationSettings</code></li>
+</ul>
+</section>
+<!-- Screenshots -->
+<section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm" id="screenshots">
+<h2 class="text-2xl font-semibold">Screenshots (from the original Jamf doc)</h2>
+<p class="mt-3 text-slate-700">This template will pull images from the Jamf Learning Hub article you referenced. To keep links stable and respect access controls, paste the publicly reachable image URLs into the manifest below. The figures will update automatically.</p>
+<!-- Image manifest UI -->
+<details class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+<summary class="cursor-pointer font-medium">Image manifest (edit these URLs)</summary>
+<div class="mt-3 space-y-2 text-sm">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+<label class="block">
+<span class="text-slate-700">Figure 1 URL (Entra admin — Enterprise apps, SAML)</span>
+<input class="mt-1 w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500" id="url-fig1" placeholder="https://…/image1.png" type="url"/>
+</label>
+<label class="block">
+<span class="text-slate-700">Figure 2 URL (RapidIdentity — IdP metadata)</span>
+<input class="mt-1 w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500" id="url-fig2" placeholder="https://…/image2.png" type="url"/>
+</label>
+<label class="block">
+<span class="text-slate-700">Figure 3 URL (Entra — SAML &amp; cert upload)</span>
+<input class="mt-1 w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500" id="url-fig3" placeholder="https://…/image3.png" type="url"/>
+</label>
+<label class="block">
+<span class="text-slate-700">Figure 4 URL (Verification / test sign-in)</span>
+<input class="mt-1 w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500" id="url-fig4" placeholder="https://…/image4.png" type="url"/>
+</label>
+</div>
+<button class="no-print mt-3 inline-flex items-center rounded-md bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700" id="apply-images" type="button">Apply URLs to page</button>
+<p class="text-xs text-slate-600">The URLs are stored only in this page while it’s open. Save the HTML after editing if you want them persisted.</p>
+</div>
+</details>
+<!-- Figure grid -->
+<div class="mt-6 grid grid-cols-1 gap-6">
+<figure class="rounded-lg border border-slate-200 bg-white p-3">
+<img alt="Entra admin center — Enterprise applications (SAML configuration screen)" class="fake-img aspect-[16/9] w-full rounded-md object-cover" data-key="fig1"/>
+<figcaption class="mt-2 text-sm text-slate-600">Figure 1 — Entra admin center: Enterprise applications (SAML config)</figcaption>
+</figure>
+<figure class="rounded-lg border border-slate-200 bg-white p-3">
+<img alt="RapidIdentity admin — Adding/inspecting IdP metadata and endpoints" class="fake-img aspect-[16/9] w-full rounded-md object-cover" data-key="fig2"/>
+<figcaption class="mt-2 text-sm text-slate-600">Figure 2 — RapidIdentity: IdP metadata &amp; endpoints</figcaption>
+</figure>
+<figure class="rounded-lg border border-slate-200 bg-white p-3">
+<img alt="Entra SAML: Basic SAML config and certificate upload" class="fake-img aspect-[16/9] w-full rounded-md object-cover" data-key="fig3"/>
+<figcaption class="mt-2 text-sm text-slate-600">Figure 3 — Entra SAML: Basic SAML config and certificate</figcaption>
+</figure>
+<figure class="rounded-lg border border-slate-200 bg-white p-3">
+<img alt="Testing: Successful sign-in / federation verification" class="fake-img aspect-[16/9] w-full rounded-md object-cover" data-key="fig4"/>
+<figcaption class="mt-2 text-sm text-slate-600">Figure 4 — Testing federation / verification</figcaption>
+</figure>
+</div>
+<p class="mt-6 text-xs text-slate-500">Note: Images remain the property of their respective owners. Ensure you have rights to embed and redistribute them within your environment.</p>
+</section>
+<!-- References -->
+<section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm" id="references">
+<h2 class="text-2xl font-semibold">References</h2>
+<ul class="mt-3 list-disc ml-6 text-slate-700 text-sm space-y-1"><li>Microsoft Entra RP (SP) SAML metadata: <a class="text-sky-700 hover:underline" href="https://nexus.microsoftonline-p.com/federationmetadata/saml20/federationmetadata.xml">nexus.microsoftonline-p.com/.../federationmetadata.xml</a></li><li>Use a SAML 2.0 IdP for SSO to Entra ID (Learn): <a class="text-sky-700 hover:underline" href="https://learn.microsoft.com/en-us/entra/identity/hybrid/connect/how-to-connect-fed-saml-idp">learn.microsoft.com/.../how-to-connect-fed-saml-idp</a></li><li>New-MgDomainFederationConfiguration (Graph PowerShell): <a class="text-sky-700 hover:underline" href="https://learn.microsoft.com/en-us/powershell/module/microsoft.graph.identity.directorymanagement/new-mgdomainfederationconfiguration?view=graph-powershell-1.0">New-MgDomainFederationConfiguration</a></li><li>Update-MgDomainFederationConfiguration (Graph PowerShell): <a class="text-sky-700 hover:underline" href="https://learn.microsoft.com/en-us/powershell/module/microsoft.graph.identity.directorymanagement/update-mgdomainfederationconfiguration?view=graph-powershell-1.0">Update-MgDomainFederationConfiguration</a></li><li>Get-MgDomainFederationConfiguration (Graph PowerShell): <a class="text-sky-700 hover:underline" href="https://learn.microsoft.com/en-us/powershell/module/microsoft.graph.identity.directorymanagement/get-mgdomainfederationconfiguration?view=graph-powershell-1.0">Get-MgDomainFederationConfiguration</a></li><li>Update-MgDomain (Graph PowerShell): <a class="text-sky-700 hover:underline" href="https://learn.microsoft.com/en-us/powershell/module/microsoft.graph.identity.directorymanagement/update-mgdomain?view=graph-powershell-1.0">Update-MgDomain</a></li><li>Connect-Entra (alias of Connect-MgGraph): <a class="text-sky-700 hover:underline" href="https://learn.microsoft.com/en-us/powershell/module/microsoft.entra.authentication/connect-entra?view=entra-powershell">Connect-Entra</a></li><li>Set-EntraDomainFederationSettings (Entra PowerShell): <a class="text-sky-700 hover:underline" href="https://learn.microsoft.com/en-us/powershell/module/microsoft.entra.directorymanagement/set-entradomainfederationsettings?view=entra-powershell">Set-EntraDomainFederationSettings</a></li><li>internalDomainFederation resource (Graph API): <a class="text-sky-700 hover:underline" href="https://learn.microsoft.com/en-us/graph/api/resources/internaldomainfederation?view=graph-rest-1.0">internalDomainFederation resource</a></li><li>Multiple-domain federation (IssuerUri uniqueness): <a class="text-sky-700 hover:underline" href="https://learn.microsoft.com/en-us/entra/identity/hybrid/connect/how-to-connect-install-multiple-domains">Multiple Domain Support</a></li><li>MSOnline/AzureAD PowerShell retirement (2025): <a class="text-sky-700 hover:underline" href="https://techcommunity.microsoft.com/blog/microsoft-entra-blog/action-required-msonline-and-azuread-powershell-retirement---2025-info-and-resou/4364991">TechCommunity announcement</a></li></ul>
+</section>
+<!-- Footer -->
+<footer class="pb-16 pt-4 text-center text-xs text-slate-500">
+<p>© 2025 — RapidIdentity &amp; Microsoft Entra ID SSO (internal guide). Tailwind-styled.</p>
+</footer>
+</main>
+<!-- Simple copy-to-clipboard & image manifest logic -->
+<script>
+    // Copy buttons
+    document.querySelectorAll('[data-copy]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = document.querySelector(btn.getAttribute('data-copy'));
+        if (!target) return;
+        const text = target.innerText;
+        navigator.clipboard.writeText(text).then(() => {
+          btn.textContent = 'Copied';
+          setTimeout(() => btn.textContent = 'Copy', 1400);
+        });
+      });
+    });
+
+    // Image manifest: apply URLs to figures
+    const applyImages = () => {
+      const urls = {
+        fig1: document.getElementById('url-fig1').value.trim(),
+        fig2: document.getElementById('url-fig2').value.trim(),
+        fig3: document.getElementById('url-fig3').value.trim(),
+        fig4: document.getElementById('url-fig4').value.trim(),
+      };
+      Object.entries(urls).forEach(([key, val]) => {
+        const img = document.querySelector('img[data-key=\"' + key + '\"]');
+        if (img) {
+          if (val) {
+            img.src = val;
+            img.classList.remove('fake-img');
+          } else {
+            img.removeAttribute('src');
+            img.classList.add('fake-img');
+          }
+        }
+      });
+    };
+    document.getElementById('apply-images').addEventListener('click', applyImages);
+  </script>
+</body>
+</html>
